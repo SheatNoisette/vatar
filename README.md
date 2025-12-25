@@ -66,6 +66,13 @@ Extract to a specific directory:
 $ vatar -x -C /tmp -f archive.tar
 ```
 
+## Tests
+
+You can run tests on the BSD version of the tar utility:
+```bash
+$ v . -o vatar && v -stats test .
+```
+
 ## License
 
 I would like to thank RXI for their implementation of Tar, which greatly
