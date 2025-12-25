@@ -17,7 +17,7 @@ using C2V and then extensively modified by hand.
 Ensure you have [V installed](https://vlang.io/) on your system.
 
 ```bash
-$ v -prod .
+$ make build
 ```
 
 ## Usage
@@ -68,9 +68,10 @@ $ vatar -x -C /tmp -f archive.tar
 
 ## Tests
 
-You can run tests on the BSD version of the tar utility:
+You can run tests against the BSD version of the tar utility:
+
 ```bash
-$ v . -o vatar && v -stats test .
+$ make test
 ```
 
 ## License
