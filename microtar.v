@@ -104,17 +104,18 @@ fn round_up(n u32, incr u32) u32 {
 
 fn checksum(rh &MtarRawHeader) u32 {
 	mut res := u32(256)
-	unsafe {
-		p := &u8(rh)
-		// Sum bytes before checksum field
-		for i := 0; i < __offsetof(MtarRawHeader, checksum); i++ {
-			res += p[i]
-		}
-		// Sum bytes after checksum field (from type onwards)
-		for i := __offsetof(MtarRawHeader, typ); i < int(sizeof(MtarRawHeader)); i++ {
-			res += p[i]
-		}
-	}
+	// Sum bytes before checksum field
+	for b in rh.name { res += b }
+	for b in rh.mode { res += b }
+	for b in rh.owner { res += b }
+	for b in rh.group { res += b }
+	for b in rh.size { res += b }
+	for b in rh.mtime { res += b }
+	// Skip checksum field
+	// Sum bytes after checksum field
+	res += rh.typ
+	for b in rh.linkname { res += b }
+	for b in rh.padding { res += b }
 	return res
 }
 
