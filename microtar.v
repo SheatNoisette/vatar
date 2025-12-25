@@ -73,7 +73,7 @@ mut:
 }
 
 pub struct MTar {
-mut:
+pub mut:
 	file           os.File
 	buffer         []u8
 	pos            u32
@@ -144,7 +144,7 @@ fn raw_to_header(rh &MtarRawHeader) !MtarHeader {
 	// Parse header fields
 	mode_str := cstring_to_string(rh.mode[..])
 	owner_str := cstring_to_string(rh.owner[..])
-	size_str := cstring_to_string(rh.size[..])
+	size_str := cstring_to_string(rh.size[..]).trim_space()
 	mtime_str := cstring_to_string(rh.mtime[..])
 
 	return MtarHeader{
