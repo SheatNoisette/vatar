@@ -77,7 +77,7 @@ fn add_to_archive(mut tar vatar.MTar, path string, verbose bool) ! {
 
 		tar.write_file_header(path, size)!
 		if size > 0 {
-			tar.write_data(content.str, size)!
+			tar.write_data(content.bytes(), size)!
 		}
 
 		if verbose {
@@ -155,9 +155,7 @@ fn extract_archive(opts CliOptions) ! {
 			// Extract file
 			mut data := []u8{len: int(header.size)}
 			if header.size > 0 {
-				unsafe {
-					tar.read_data(&data[0], header.size)!
-				}
+				tar.read_data(mut data, header.size)!
 			}
 
 			// Ensure parent directory exists
