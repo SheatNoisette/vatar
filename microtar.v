@@ -23,6 +23,17 @@ module vatar
  */
 import os
 
+// Raw structure offsets
+const header_name_size = 100
+const header_mode_size = 8
+const header_owner_size = 8
+const header_group_size = 8
+const header_size_size = 12
+const header_mtime_size = 12
+const header_checksum_size = 8
+const header_linkname_size = 100
+const header_padding_size = 255
+
 // Error codes
 pub enum MtarError {
 	success      = 0
@@ -60,16 +71,16 @@ pub mut:
 
 struct MtarRawHeader {
 mut:
-	name     [100]u8
-	mode     [8]u8
-	owner    [8]u8
-	group    [8]u8
-	size     [12]u8
-	mtime    [12]u8
-	checksum [8]u8
+	name     [header_name_size]u8
+	mode     [header_mode_size]u8
+	owner    [header_owner_size]u8
+	group    [header_group_size]u8
+	size     [header_size_size]u8
+	mtime    [header_mtime_size]u8
+	checksum [header_checksum_size]u8
 	typ      u8
-	linkname [100]u8
-	padding  [255]u8
+	linkname [header_linkname_size]u8
+	padding  [header_padding_size]u8
 }
 
 pub struct MTar {
@@ -103,6 +114,7 @@ fn round_up(n u32, incr u32) u32 {
 }
 
 fn checksum(rh &MtarRawHeader) u32 {
+	// vfmt off
 	mut res := u32(256)
 	// Sum bytes before checksum field
 	for b in rh.name { res += b }
@@ -116,6 +128,7 @@ fn checksum(rh &MtarRawHeader) u32 {
 	res += rh.typ
 	for b in rh.linkname { res += b }
 	for b in rh.padding { res += b }
+	// vfmt on
 	return res
 }
 
@@ -324,7 +337,45 @@ pub fn (mut tar MTar) read_header(mut h MtarHeader) ! {
 		return error_with_code(MtarError.read_fail.str(), int(MtarError.read_fail))
 	}
 
-	unsafe { C.memcpy(&rh, rh_bytes.data, rh_bytes.len) }
+	// Manually copy bytes to struct fields, for a pure, but really pure V
+	// without struct packing (@[packed]), which is not portable in other
+	// backends.
+
+	// If you have a better way to handle this, please let me know !
+	// vfmt off
+	// {
+	mut offset := 0
+
+	for i in 0 .. header_name_size  { rh.name[i] = rh_bytes[offset + i]        }
+	offset += header_name_size
+
+	for i in 0 .. header_mode_size  { rh.mode[i] = rh_bytes[offset + i]        }
+	offset += header_mode_size
+
+	for i in 0 .. header_owner_size { rh.owner[i] = rh_bytes[offset + i]       }
+	offset += header_owner_size
+
+	for i in 0 .. header_group_size { rh.group[i] = rh_bytes[offset + i]       }
+	offset += header_group_size
+
+	for i in 0 .. header_size_size 	{ rh.size[i] = rh_bytes[offset + i]        }
+	offset += header_size_size
+
+	for i in 0 .. header_mtime_size { rh.mtime[i] = rh_bytes[offset + i]       }
+	offset += header_mtime_size
+
+	for i in 0 .. header_checksum_size { rh.checksum[i] = rh_bytes[offset + i] }
+	offset += header_checksum_size
+
+	rh.typ = rh_bytes[offset]
+	offset += 1
+
+	for i in 0 .. header_linkname_size { rh.linkname[i] = rh_bytes[offset + i] }
+	offset += header_linkname_size
+
+	for i in 0 .. header_padding_size { rh.padding[i] = rh_bytes[offset + i]   }
+	// vfmt on
+	// }
 
 	tar.pos += u32(bytes_read)
 
