@@ -176,63 +176,25 @@ fn header_to_raw(h &MtarHeader) MtarRawHeader {
 	mut rh := MtarRawHeader{}
 
 	// Convert header to raw format
-	mode_str := '${h.mode:o}'
-	for i in 0 .. mode_str.len {
-		rh.mode[i] = mode_str[i]
-	}
-	for i := mode_str.len; i < 8; i++ {
-		rh.mode[i] = 0
-	}
-
-	owner_str := '${h.owner:o}'
-	for i in 0 .. owner_str.len {
-		rh.owner[i] = owner_str[i]
-	}
-	for i := owner_str.len; i < 8; i++ {
-		rh.owner[i] = 0
-	}
-
-	size_str := '${h.size:o}'
-	for i in 0 .. size_str.len {
-		rh.size[i] = size_str[i]
-	}
-	for i := size_str.len; i < 12; i++ {
-		rh.size[i] = 0
-	}
-
-	mtime_str := '${h.mtime:o}'
-	for i in 0 .. mtime_str.len {
-		rh.mtime[i] = mtime_str[i]
-	}
-	for i := mtime_str.len; i < 12; i++ {
-		rh.mtime[i] = 0
-	}
+	// vfmt off
+	for i, b in '${h.mode:o}'.bytes() { rh.mode[i] = b }
+	for i, b in '${h.owner:o}'.bytes() { rh.owner[i] = b }
+	for i, b in '${h.size:o}'.bytes() { rh.size[i] = b }
+	for i, b in '${h.mtime:o}'.bytes() { rh.mtime[i] = b }
 
 	rh.typ = if h.typ != 0 { h.typ } else { u8(MtarType.treg) }
 
-	for i in 0 .. h.name.len {
-		rh.name[i] = h.name[i]
-	}
-	for i := h.name.len; i < 100; i++ {
-		rh.name[i] = 0
-	}
-
-	for i in 0 .. h.linkname.len {
-		rh.linkname[i] = h.linkname[i]
-	}
-	for i := h.linkname.len; i < 100; i++ {
-		rh.linkname[i] = 0
-	}
+	for i, b in h.name.bytes() { rh.name[i] = b }
+	for i, b in h.linkname.bytes() { rh.linkname[i] = b }
 
 	chksum := checksum(&rh)
 	chksum_str := '${chksum:06o}'
-	for i in 0 .. 6 {
-		rh.checksum[i] = chksum_str[i]
-	}
+	for i in 0 .. 6 { rh.checksum[i] = chksum_str[i] }
 	rh.checksum[6] = 0
 	rh.checksum[7] = ` `
 
 	return rh
+	// vfmt on
 }
 
 // Public API
