@@ -8,9 +8,8 @@ VAtar (V Atto tar) is a barebone `tar` utility written in VLang.
 > a friendly nudge toward a cleaner, better reimplementation. Bugs may be fixed
 > and some basic features may (not) be added.
 
-For now, this is an "impure" V implementation of tar, as some parts of the
-modified tar library use unsafe code. The original library by RXI was translated
-using C2V and then extensively modified by hand.
+The original library by RXI was translated using C2V and then extensively
+modified by hand.
 
 ## Building
 

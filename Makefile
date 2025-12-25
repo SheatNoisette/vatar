@@ -1,7 +1,7 @@
 .PHONY: build test clean
 
 build:
-	v -prod . -o vatar
+	v -prod -Wimpure-v . -o vatar
 
 build_fast:
 	v . -o vatar
