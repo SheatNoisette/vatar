@@ -348,7 +348,7 @@ pub fn (mut tar MTar) read_header(mut h MtarHeader) ! {
 	h = raw_to_header(&rh)!
 }
 
-pub fn (mut tar MTar) read_data(ptr &u8, size u32) ! {
+pub fn (mut tar MTar) read_data(mut buf []u8, size u32) ! {
 	// First read: get size and seek to data
 	if tar.remaining_data == 0 {
 		mut h := MtarHeader{}
@@ -358,8 +358,10 @@ pub fn (mut tar MTar) read_data(ptr &u8, size u32) ! {
 	}
 
 	// Read data
-	mut data_buf := unsafe { ptr.vbytes(int(size)) }
-	bytes_read := tar.file.read(mut data_buf) or {
+	if int(size) > buf.len {
+		return error_with_code(MtarError.read_fail.str(), int(MtarError.read_fail))
+	}
+	bytes_read := tar.file.read(mut buf[..int(size)]) or {
 		return error_with_code(MtarError.read_fail.str(), int(MtarError.read_fail))
 	}
 
@@ -407,10 +409,12 @@ pub fn (mut tar MTar) write_dir_header(name string) ! {
 	tar.write_header(&h)!
 }
 
-pub fn (mut tar MTar) write_data(data &u8, size u32) ! {
+pub fn (mut tar MTar) write_data(buf []u8, size u32) ! {
 	// Write data to buffer
-	data_buf := unsafe { data.vbytes(int(size)) }
-	tar.buffer << data_buf
+	if int(size) > buf.len {
+		return error_with_code(MtarError.write_fail.str(), int(MtarError.write_fail))
+	}
+	tar.buffer << buf[..int(size)]
 	tar.pos += size
 	tar.remaining_data -= size
 
