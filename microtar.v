@@ -385,7 +385,43 @@ pub fn (mut tar MTar) write_header(h &MtarHeader) ! {
 
 	// Write header to buffer
 	mut rh_bytes := []u8{len: int(sizeof(MtarRawHeader))}
-	unsafe { C.memcpy(rh_bytes.data, &rh, rh_bytes.len) }
+
+	// Manually copy struct fields to byte array, same problem as read_header()
+	// Pull requests welcome!
+
+	// vfmt off
+	mut offset := 0
+
+	for i in 0 .. header_name_size     { rh_bytes[offset + i] = rh.name[i]     }
+	offset += header_name_size
+
+	for i in 0 .. header_mode_size     { rh_bytes[offset + i] = rh.mode[i]     }
+	offset += header_mode_size
+
+	for i in 0 .. header_owner_size    { rh_bytes[offset + i] = rh.owner[i]    }
+	offset += header_owner_size
+
+	for i in 0 .. header_group_size    { rh_bytes[offset + i] = rh.group[i]    }
+	offset += header_group_size
+
+	for i in 0 .. header_size_size     { rh_bytes[offset + i] = rh.size[i]     }
+	offset += header_size_size
+
+	for i in 0 .. header_mtime_size    { rh_bytes[offset + i] = rh.mtime[i]    }
+	offset += header_mtime_size
+
+	for i in 0 .. header_checksum_size { rh_bytes[offset + i] = rh.checksum[i] }
+	offset += header_checksum_size
+
+	rh_bytes[offset] = rh.typ
+	offset += 1
+
+	for i in 0 .. header_linkname_size { rh_bytes[offset + i] = rh.linkname[i] }
+	offset += header_linkname_size
+
+	for i in 0 .. header_padding_size  { rh_bytes[offset + i] = rh.padding[i]  }
+	// vfmt on
+
 	tar.buffer << rh_bytes
 	tar.pos += u32(rh_bytes.len)
 }
