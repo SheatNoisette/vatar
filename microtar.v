@@ -127,20 +127,6 @@ fn cstring_to_string(arr []u8) string {
 	return arr[0..i].bytestr()
 }
 
-// @TODO: Use V built-in or refactor it completely instead of this boilerplate
-fn string_to_cstring(s string, mut arr []u8) {
-	mut len := s.len
-	if len >= arr.len {
-		len = arr.len - 1
-	}
-	for i := 0; i < len; i++ {
-		arr[i] = s[i]
-	}
-	for i := len; i < arr.len; i++ {
-		arr[i] = 0
-	}
-}
-
 fn raw_to_header(rh &MtarRawHeader) !MtarHeader {
 	// Check if record is null
 	if rh.checksum[0] == 0 {
