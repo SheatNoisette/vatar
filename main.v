@@ -7,11 +7,12 @@ import v.vmod
 
 struct CliOptions {
 mut:
-	command  string
-	archive  string
-	files    []string
-	verbose  bool
-	use_gzip bool
+	command   string
+	archive   string
+	files     []string
+	verbose   bool
+	use_gzip  bool
+	directory string
 }
 
 fn create_archive(opts CliOptions) ! {
@@ -97,6 +98,11 @@ fn extract_archive(opts CliOptions) ! {
 		return error('Cannot read archive file: ${opts.archive}')
 	}
 
+	// Change to extraction directory if specified
+	if opts.directory != '' {
+		os.chdir(opts.directory) or { return error('Error changing directory: ${err}') }
+	}
+
 	// Check if file is gzip compressed (either by flag or auto-detection)
 	is_gzip := if opts.use_gzip {
 		true
@@ -135,11 +141,17 @@ fn extract_archive(opts CliOptions) ! {
 
 		if header.typ == u8(vatar.MtarType.tdir) {
 			// Create directory
-			os.mkdir_all(header.name) or { return error('Cannot create directory: ${header.name}') }
+			os.mkdir_all(header.name.trim_right('/')) or {
+				return error('Cannot create directory: ${header.name}')
+			}
 			if opts.verbose {
 				println('Extracting directory: ${header.name}')
 			}
 		} else if header.typ == u8(vatar.MtarType.treg) {
+			// Seek to data position
+			tar.seek(tar.pos + u32(sizeof(vatar.MtarRawHeader)))!
+			tar.remaining_data = header.size
+
 			// Extract file
 			mut data := []u8{len: int(header.size)}
 			if header.size > 0 {
@@ -224,9 +236,9 @@ fn list_archive(opts CliOptions) ! {
 		}
 
 		if header.typ == u8(vatar.MtarType.tdir) {
-			println('${header.name}/')
+			println(header.name)
 		} else if header.typ == u8(vatar.MtarType.treg) {
-			println('${header.name} (${header.size} bytes)')
+			println(header.name)
 			total_files++
 			total_size += header.size
 		}
@@ -293,13 +305,6 @@ fn main() {
 		return
 	}
 
-	if directory != '' {
-		os.chdir(directory) or {
-			println('Error changing directory: ${err}')
-			return
-		}
-	}
-
 	if create {
 		files := args
 		if files.len == 0 {
@@ -322,11 +327,12 @@ fn main() {
 			return
 		}
 		opts := CliOptions{
-			command:  'extract'
-			archive:  file
-			files:    []
-			verbose:  verbose
-			use_gzip: use_gzip
+			command:   'extract'
+			archive:   file
+			files:     []
+			verbose:   verbose
+			use_gzip:  use_gzip
+			directory: directory
 		}
 		extract_archive(opts) or { println('Error: ${err}') }
 	} else if list {
@@ -336,11 +342,12 @@ fn main() {
 			return
 		}
 		opts := CliOptions{
-			command:  'list'
-			archive:  file
-			files:    []
-			verbose:  verbose
-			use_gzip: use_gzip
+			command:   'list'
+			archive:   file
+			files:     []
+			verbose:   verbose
+			use_gzip:  use_gzip
+			directory: directory
 		}
 		list_archive(opts) or { println('Error: ${err}') }
 	}
