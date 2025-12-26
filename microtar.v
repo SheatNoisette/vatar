@@ -32,7 +32,14 @@ const header_size_size = 12
 const header_mtime_size = 12
 const header_checksum_size = 8
 const header_linkname_size = 100
-const header_padding_size = 255
+const header_magic_size = 6
+const header_version_size = 2
+const header_uname_size = 32
+const header_gname_size = 32
+const header_devmajor_size = 8
+const header_devminor_size = 8
+const header_prefix_size = 155
+const header_padding_size = 12
 
 // Error codes
 pub enum MtarError {
@@ -80,6 +87,13 @@ mut:
 	checksum [header_checksum_size]u8
 	typ      u8
 	linkname [header_linkname_size]u8
+	magic    [header_magic_size]u8
+	version  [header_version_size]u8
+	uname    [header_uname_size]u8
+	gname    [header_gname_size]u8
+	devmajor [header_devmajor_size]u8
+	devminor [header_devminor_size]u8
+	prefix   [header_prefix_size]u8
 	padding  [header_padding_size]u8
 }
 
@@ -127,6 +141,13 @@ fn checksum(rh &MtarRawHeader) u32 {
 	// Sum bytes after checksum field
 	res += rh.typ
 	for b in rh.linkname { res += b }
+	for b in rh.magic { res += b }
+	for b in rh.version { res += b }
+	for b in rh.uname { res += b }
+	for b in rh.gname { res += b }
+	for b in rh.devmajor { res += b }
+	for b in rh.devminor { res += b }
+	for b in rh.prefix { res += b }
 	for b in rh.padding { res += b }
 	// vfmt on
 	return res
@@ -161,13 +182,22 @@ fn raw_to_header(rh &MtarRawHeader) !MtarHeader {
 	size_str := cstring_to_string(rh.size[..]).trim_space()
 	mtime_str := cstring_to_string(rh.mtime[..])
 
+	// Combine prefix and name for GNU tar format
+	name_str := cstring_to_string(rh.name[..])
+	prefix_str := cstring_to_string(rh.prefix[..])
+	full_name := if prefix_str.len > 0 {
+		'${prefix_str}/${name_str}'
+	} else {
+		name_str
+	}
+
 	return MtarHeader{
 		mode:     u32(mode_str.parse_uint(8, 32) or { 0 })
 		owner:    u32(owner_str.parse_uint(8, 32) or { 0 })
 		size:     u32(size_str.parse_uint(8, 32) or { 0 })
 		mtime:    u32(mtime_str.parse_uint(8, 32) or { 0 })
 		typ:      rh.typ
-		name:     cstring_to_string(rh.name[..])
+		name:     full_name
 		linkname: cstring_to_string(rh.linkname[..])
 	}
 }
@@ -184,8 +214,27 @@ fn header_to_raw(h &MtarHeader) MtarRawHeader {
 
 	rh.typ = if h.typ != 0 { h.typ } else { u8(MtarType.treg) }
 
-	for i, b in h.name.bytes() { rh.name[i] = b }
+	// Handle long filenames using GNU tar prefix field, it's clunky, but it works
+	if h.name.len > 100 {
+		last_slash := h.name.last_index('/') or { h.name.len }
+		if last_slash > 0 && h.name.len - last_slash - 1 <= 100 && last_slash <= 155 {
+			prefix_part := h.name[0..last_slash]
+			name_part := h.name[last_slash + 1..]
+			for i, b in prefix_part.bytes() { rh.prefix[i] = b }
+			for i, b in name_part.bytes() { rh.name[i] = b }
+		} else {
+			for i, b in h.name.bytes() { if i < 100 { rh.name[i] = b } }
+		}
+	} else {
+		for i, b in h.name.bytes() { rh.name[i] = b }
+	}
+
 	for i, b in h.linkname.bytes() { rh.linkname[i] = b }
+
+	// Set magic and version for GNU/POSIX tar
+	for i, b in 'ustar'.bytes() { rh.magic[i] = b }
+	rh.version[0] = `0`
+	rh.version[1] = `0`
 
 	chksum := checksum(&rh)
 	chksum_str := '${chksum:06o}'
@@ -335,6 +384,27 @@ pub fn (mut tar MTar) read_header(mut h MtarHeader) ! {
 	for i in 0 .. header_linkname_size { rh.linkname[i] = rh_bytes[offset + i] }
 	offset += header_linkname_size
 
+	for i in 0 .. header_magic_size { rh.magic[i] = rh_bytes[offset + i]       }
+	offset += header_magic_size
+
+	for i in 0 .. header_version_size { rh.version[i] = rh_bytes[offset + i]   }
+	offset += header_version_size
+
+	for i in 0 .. header_uname_size { rh.uname[i] = rh_bytes[offset + i]       }
+	offset += header_uname_size
+
+	for i in 0 .. header_gname_size { rh.gname[i] = rh_bytes[offset + i]       }
+	offset += header_gname_size
+
+	for i in 0 .. header_devmajor_size { rh.devmajor[i] = rh_bytes[offset + i] }
+	offset += header_devmajor_size
+
+	for i in 0 .. header_devminor_size { rh.devminor[i] = rh_bytes[offset + i] }
+	offset += header_devminor_size
+
+	for i in 0 .. header_prefix_size { rh.prefix[i] = rh_bytes[offset + i]     }
+	offset += header_prefix_size
+
 	for i in 0 .. header_padding_size { rh.padding[i] = rh_bytes[offset + i]   }
 	// vfmt on
 	// }
@@ -419,7 +489,28 @@ pub fn (mut tar MTar) write_header(h &MtarHeader) ! {
 	for i in 0 .. header_linkname_size { rh_bytes[offset + i] = rh.linkname[i] }
 	offset += header_linkname_size
 
-	for i in 0 .. header_padding_size  { rh_bytes[offset + i] = rh.padding[i]  }
+	for i in 0 .. header_magic_size { rh_bytes[offset + i] = rh.magic[i]       }
+	offset += header_magic_size
+
+	for i in 0 .. header_version_size { rh_bytes[offset + i] = rh.version[i]   }
+	offset += header_version_size
+
+	for i in 0 .. header_uname_size { rh_bytes[offset + i] = rh.uname[i]       }
+	offset += header_uname_size
+
+	for i in 0 .. header_gname_size { rh_bytes[offset + i] = rh.gname[i]       }
+	offset += header_gname_size
+
+	for i in 0 .. header_devmajor_size { rh_bytes[offset + i] = rh.devmajor[i] }
+	offset += header_devmajor_size
+
+	for i in 0 .. header_devminor_size { rh_bytes[offset + i] = rh.devminor[i] }
+	offset += header_devminor_size
+
+	for i in 0 .. header_prefix_size { rh_bytes[offset + i] = rh.prefix[i]     }
+	offset += header_prefix_size
+
+	for i in 0 .. header_padding_size { rh_bytes[offset + i] = rh.padding[i]   }
 	// vfmt on
 
 	tar.buffer << rh_bytes

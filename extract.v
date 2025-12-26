@@ -9,11 +9,6 @@ fn extract_archive(opts CliOptions) ! {
 		return error('Cannot read archive file: ${opts.archive}')
 	}
 
-	// Change to extraction directory if specified
-	if opts.directory != '' {
-		os.chdir(opts.directory) or { return error('Error changing directory: ${err}') }
-	}
-
 	// Check if file is gzip compressed (either by flag or auto-detection)
 	is_gzip := if opts.use_gzip {
 		true
@@ -26,6 +21,11 @@ fn extract_archive(opts CliOptions) ! {
 		tar_data = gzip.decompress(archive_data) or {
 			return error('Failed to decompress archive data')
 		}
+	}
+
+	// Change to extraction directory if specified
+	if opts.directory != '' {
+		os.chdir(opts.directory) or { return error('Error changing directory: ${err}') }
 	}
 
 	// Create a temporary file with the tar data

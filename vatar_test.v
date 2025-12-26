@@ -255,3 +255,57 @@ fn test_directory_archiving() {
 		'torlan.txt')}')!
 	assert original_l2 == extracted_l2, 'torlan file mismatch'
 }
+
+fn test_long_filename() {
+	test_dir := os.join_path(os.temp_dir(), 'vatar_test_long_filename_${time.now().unix()}')
+	os.mkdir(test_dir) or { panic(err) }
+	defer { cleanup_test_dir(test_dir) }
+
+	vatar_path := os.join_path(os.getwd(), vatar_exe)
+
+	// Create a file with a long prefix and short filename to test prefix field usage,
+	// so we'll create a deeply nested directory structure to make a long prefix
+	// because we are a naughty archiver
+	mut nested_dir := test_dir
+	for i in 0 .. 10 {
+		nested_dir = os.join_path(nested_dir, 'level${i}')
+		os.mkdir(nested_dir)!
+	}
+	short_name := 'short.txt'
+	long_name_path := os.join_path(nested_dir, short_name)
+	content := 'This is content of a file with a very long path that should be preserved correctly through archiving and extraction.'
+	os.write_file(long_name_path, content)!
+
+	archive_path := os.join_path(test_dir, 'long_name_test.tar')
+
+	old_cwd := os.getwd()
+	os.chdir(test_dir) or { panic(err) }
+	defer { os.chdir(old_cwd) or {} }
+
+	archive_name := 'long_name_test.tar'
+	result := run_vatar(vatar_path, ['-c', '-f', archive_name, 'level0'])
+	assert result.exit_code == 0, 'vatar create with long filename failed'
+
+	// Verify archive exists
+	assert os.exists(archive_name), 'Archive with long filename not created'
+
+	// Extract with vatar
+	extract_dir_name := 'extract_long_name'
+	os.mkdir(extract_dir_name)!
+
+	vatar_result := run_vatar(vatar_path, ['-x', '-f', archive_name, '-C', extract_dir_name])
+	assert vatar_result.exit_code == 0, 'vatar extract with long filename failed'
+
+	// The archived path (relative now)
+	archived_path := 'level0/level1/level2/level3/level4/level5/level6/level7/level8/level9/short.txt'
+
+	// Verify extraction worked
+	extract_dir := os.join_path(test_dir, extract_dir_name)
+	extracted_file_path := os.join_path(extract_dir, archived_path)
+	assert os.exists(extracted_file_path), 'Extracted file with long path not found'
+	extracted_content := os.read_file(extracted_file_path)!
+	assert extracted_content == content, 'Content mismtch for long path file'
+
+	// Also verify the directory structure too...
+	assert os.exists(os.join_path(extract_dir, 'level0/level1/level2/level3/level4/level5/level6/level7/level8/level9')), 'Nested directories not extracted'
+}
